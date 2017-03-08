@@ -29,10 +29,10 @@ void error(const char *msg)
 int main(int argc, char *argv[])
 {
     //character buffers
-    char hash_message[1024];
-    char plan_message[1024];
+    char hash_message[128];
+    char plan_message[128];
     char iv[128];
-    char key[1024];
+    char key[32];
     
     //command logic
     char* WRITE = "write";
