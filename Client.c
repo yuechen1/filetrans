@@ -19,6 +19,11 @@
 *
 */
 
+typedef int bool;
+#define true 1
+#define false 0
+
+
 //code from prof
 void error(const char *msg)
 {
@@ -79,7 +84,7 @@ int main(int argc, char *argv[])
         //get file
         strcpy(filename, argv[2]);
         //check if the file exisits
-        if(access(filename, F_OK) != -1_{
+        if(access(filename, F_OK) != -1){
             if(isread){
                 file = fopen(filename,"r");
             }else{
@@ -105,7 +110,7 @@ int main(int argc, char *argv[])
         }while(1);
         strncpy(server, tempbuffer, i);
         strncpy(port, &tempbuffer[i+1], sizeof(argv[3]) - i - 1);
-
+        printf("port: %s", port);
 
         //see which cipher is being used
         if(strncmp(argv[4], CIPHER_NONE, sizeof(CIPHER_NONE)) == 0){
@@ -124,29 +129,28 @@ int main(int argc, char *argv[])
            if(argc != 6){
                 error("no key found");
             }else{
-                strcpy(key256, argvp[5]);
+                strcpy(key256, argv[5]);
             }
         }else{
             error("incorrect cipher");
         }
-        printf("port: %s", port);
 
 
     }else{
-        error("invalid input")
+        error("invalid input");
     }
 
 
     //set up the socket
     bzero((char *) &serverAddr, sizeof(serverAddr));
     serverAddr.sin_family = AF_INET;
-    serverAddr.sin_port = htons(portno);
+    serverAddr.sin_port = htons(atoi(port));
     bcopy((char *)serverHost->h_addr, (char *)&serverAddr.sin_addr.s_addr, serverHost->h_length);
-    memset(serverAddr.sin_zero, '\0', sizeof(serverAddr.sin_zero));inputbuffer
+    memset(serverAddr.sin_zero, '\0', sizeof(serverAddr.sin_zero));
     serveraddr_size = sizeof(serverAddr);
 
     //create local socket
-    sockd = socket(AF_INET,SOCK_STREAM, 0);
+    sockfd = socket(AF_INET,SOCK_STREAM, 0);
 
     //connect socket
     if(connect(sockfd, (struct sockaddr*) &serverAddr, serveraddr_size) < 0){
@@ -158,13 +162,14 @@ int main(int argc, char *argv[])
     int bytesread;
     int acks;
     while(1){
-        bytesread = read(serverAddr, ack, 1024, 0);
+        //TODO, creat new socket for server side
+        bytesread = read(sockfd, ack, 1024);
         if(bytesread > 0);{
             acks = atoi(ack);
             acks++;
             bzero(ack, sizeof(ack));
             sprintf(ack, "%d", acks);
-            write(sockfd, acks,sizeof(acks));
+            write(sockfd, ack, sizeof(ack));
         }
         bzero(ack, sizeof(ack));
     }

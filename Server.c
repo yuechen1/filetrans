@@ -36,6 +36,8 @@ int main(int argc, char *argv[])
     int sockfd, newsockfd, portno;      
     socklen_t clilen;    
     
+    //
+    int n;
 
     //File IO
     FILE *file;
@@ -68,16 +70,16 @@ int main(int argc, char *argv[])
     int acks;
     do {
         bzero(ack, sizeof(ack));
-        n = read(sockfd,ack, 1024, 0);
+        n = read(sockfd,ack, 1024);
         printf("recive: %s\n", ack);
         if(n > 0);{
             acks = atoi(ack);
             acks++;
             bzero(ack, sizeof(ack));
             sprintf(ack, "%d", acks);
-            write(sockfd, acks,sizeof(acks));
+            write(sockfd, ack,sizeof(ack));
         }
-    }while (offStatus == 1);
+    }while (1);
     
     close(newsockfd);
     close(sockfd);
