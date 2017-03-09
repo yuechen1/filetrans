@@ -62,6 +62,9 @@ int main(int argc, char *argv[])
     struct hostent *serverHost;
     socklen_t serveraddr_size;
 
+    //file I/O
+    FILE *file;
+    size_t readsize;
 
     /*TODO
     * split the variables and stuff here!!!
@@ -75,7 +78,16 @@ int main(int argc, char *argv[])
         }
         //get file
         strcpy(filename, argv[2]);
-        //TODO, check if the file exisits
+        //check if the file exisits
+        if(access(filename, F_OK) != -1_{
+            if(isread){
+                file = fopen(filename,"r");
+            }else{
+                file = fopen(filename, "w");
+            }
+        }else{
+            error("cannot open file");
+        }
 
         //find the hostname and port number
         strcpy(tempbuffer, argv[3]);
@@ -147,12 +159,14 @@ int main(int argc, char *argv[])
     int acks;
     while(1){
         bytesread = read(serverAddr, ack, 1024, 0);
-        if(bytesread == 0);{
+        if(bytesread > 0);{
             acks = atoi(ack);
             acks++;
+            bzero(ack, sizeof(ack));
             sprintf(ack, "%d", acks);
             write(sockfd, acks,sizeof(acks));
         }
+        bzero(ack, sizeof(ack));
     }
     //hand shake stuff
     /*
