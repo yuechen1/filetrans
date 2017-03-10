@@ -34,6 +34,7 @@ int main(int argc, char *argv[])
     char ack[1024];
     char iv[128];
     char key[32];
+    char filename[1024];
 
     //socket comunication information
     struct sockaddr_in serv_addr, cli_addr;
@@ -42,6 +43,7 @@ int main(int argc, char *argv[])
     
     //
     int n;
+    int i;
 
     //File IO
     FILE *file;
@@ -80,6 +82,30 @@ int main(int argc, char *argv[])
 
     int acks;
     bzero(ack, sizeof(ack));
+    n = read(newsockfd, ack, 128);
+    if(n > 0){
+        //check for command and stuff
+        while (1){
+            if (ack[i] == ' '){
+                break;
+            }
+            else if (ack[i] == '\0')
+            {
+                error("cannot find port number");
+            }else{
+                i++;
+            }
+        }
+        strncpy(plan_message, ack, i);
+        strncpy(filename, &ack[i + 1], (n - i));
+
+
+        printf("command: %s\n", plan_message);
+        fflush(stdout);
+        printf("filename: %s\n", filename);
+        fflush(stdout);
+    }
+
     while(1){
         n = read(newsockfd, ack, 128);
         if(n > 0){
