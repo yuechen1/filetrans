@@ -52,6 +52,8 @@ int main(int argc, char *argv[])
     // 1 = aes128
     // 2 = aes256
     int cipherNumber = 0;
+    int bytesread;
+    int acks;
 
     //file I/O   
     char filename[1024];
@@ -91,7 +93,7 @@ int main(int argc, char *argv[])
         }else{
             file = fopen(filename, "w");
         }
-        if(file != NULL){
+        if(file){
             printf("file found: %s", filename);
             fflush(stdout);
         }
@@ -146,7 +148,8 @@ int main(int argc, char *argv[])
         }
 
     }else{
-        error("invalid input");
+        error("invalid input");    int bytesread;
+    int acks;
     }
 
     //set up the socket
@@ -166,15 +169,23 @@ int main(int argc, char *argv[])
         error("ERROR, cannot connect to server socket");
     }
 
-    write(sockfd, "first message", 14);
-
-    int bytesread;
-    int acks;
-    acks = 1;
-    sprintf(ack, "%d", acks);
-    write(sockfd, filename, sizeof(filename));
-    while(1){
-        bytesread = read(sockfd, ack, 1024);
+    //send command and filename to server
+    if(isread == 1){
+        sprintf(ack, "%s %s", mREAD, filename);
+    }else{
+        sprintf(ack, "%s %s", mWRITE, filename);
+    }
+    write(sockfd, ack, sizeof(ack));
+    printf("%s\n",ack);
+    fflush(stdout);
+    while((fread(plan_message, 1, sizeof(plan_message), file)>0)){
+        write(sockfd, plan_message, sizeof(plan_message));
+        printf("%s\n",plan_message);
+        fflush(stdout);
+        bzero(plan_message, sizeof(plan_message));
+    }
+    /*while(1){
+        bytesread = read(file, ack, 1024);
         if(bytesread > 0){
             acks = atoi(ack);
             acks++;
@@ -183,7 +194,7 @@ int main(int argc, char *argv[])
             write(sockfd, ack, sizeof(ack));
             bzero(ack, sizeof(ack));
         }
-    }
+    }*/
     printf("just finish the loop");
     fflush(stdout);
     //hand shake stuff

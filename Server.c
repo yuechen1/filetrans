@@ -79,19 +79,19 @@ int main(int argc, char *argv[])
     }
 
     int acks;
+    bzero(ack, sizeof(ack));
     while(1){
-        bzero(ack, sizeof(ack));
-        n = read(newsockfd, ack, 1024);
+        n = read(newsockfd, ack, 128);
         if(n > 0){
             printf("recive: %s\n", ack);
             fflush(stdout);
-            acks = atoi(ack);
-            acks++;
-            bzero(ack, sizeof(ack));
-            sprintf(ack, "%d", acks);
-            write(newsockfd, ack,sizeof(ack));
+            bzero(ack, 128);
+            //write(newsockfd, ack,sizeof(ack));
         }
     }
+
+    printf("just finish the loop\n");
+    fflush(stdout);
 
     close(newsockfd);
     close(sockfd);
