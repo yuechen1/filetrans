@@ -19,11 +19,6 @@
 *
 */
 
-typedef int bool;
-#define true 1
-#define false 0
-
-
 //code from prof
 void error(const char *msg)
 {
@@ -45,12 +40,12 @@ int main(int argc, char *argv[])
     char key256[33];
     
     //command logic
-    char* WRITE = "write";
-    char* READ = "read";
-    char* CIPHER_NONE = "none";
-    char* CIPHER_AES128 = "aes128";
-    char* CIPHER_AES256 = "aes256";
-    bool isread = false;
+    char* mWRITE = "write";
+    char* mREAD = "read";
+    char* mCIPHER_NONE = "none";
+    char* mCIPHER_AES128 = "aes128";
+    char* mCIPHER_AES256 = "aes256";
+    int isread = 1;
     char server[1024];
     char port[1024];
     // 0 = none
@@ -71,33 +66,40 @@ int main(int argc, char *argv[])
     FILE *file;
     size_t readsize;
 
+
     /*TODO
     * split the variables and stuff here!!!
     */
-    if(argc == 6 || argc == 5){
+    //printf("Program started\n");
+    if(argc > 4 && argc < 6){
+        //printf("see if read or write\n");
+
         //see if read or write
-        if(strncmp(argv[1], WRITE, 5) == 0){
-            isread = false;
-        }else if(strncmp(argv[1], READ, 4)){
-            isread = true;
+        if(strncmp(argv[1], mWRITE, 5) == 0){
+            isread = 0;
+        }else if(strncmp(argv[1], mREAD, 4)){
+            isread = 1;
         }
+        printf("it is: %s\n", argv[1]);
+
+        //printf("get filename\n");
         //get file
         strcpy(filename, argv[2]);
         //check if the file exisits
-        if(access(filename, F_OK) != -1){
-            if(isread){
-                file = fopen(filename,"r");
-            }else{
-                file = fopen(filename, "w");
-            }
+        if(isread == 1){
+            file = fopen(filename,"r");
         }else{
-            error("cannot open file");
+            file = fopen(filename, "w");
+        }
+        if(file != NULL){
+            printf("file found: %s", filename);
+            fflush(stdout);
         }
 
         //find the hostname and port number
         strcpy(tempbuffer, argv[3]);
         i = 0;
-        do{
+        while(1){
             if(tempbuffer[i] == ':')
             {
                 break;
@@ -107,41 +109,48 @@ int main(int argc, char *argv[])
             }else{
                 i++;
             }
-        }while(1);
+        }
         strncpy(server, tempbuffer, i);
-        strncpy(port, &tempbuffer[i+1], sizeof(argv[3]) - i - 1);
-        printf("port: %s", port);
+        
+        printf("server: %s\n", server);
+        fflush(stdout);
+        strncpy(port, &tempbuffer[i+1], (strlen(argv[3]) - i));
+        printf("port: %s\n", port);
+        fflush(stdout);
 
         //see which cipher is being used
-        if(strncmp(argv[4], CIPHER_NONE, sizeof(CIPHER_NONE)) == 0){
+        if(strncmp(argv[4], mCIPHER_NONE, sizeof(mCIPHER_NONE)) == 0){
             cipherNumber = 0;
         }
-        else if(strncmp(argv[4], CIPHER_AES128, sizeof(CIPHER_AES128)) == 0){
+        else if(strncmp(argv[4], mCIPHER_AES128, sizeof(mCIPHER_AES128)) == 0){
             cipherNumber = 1;
             if(argc != 6){
-                error("no key found");
+                strcpy(key128, "0000000000000000");
             }else{
                 strcpy(key128, argv[5]);
             }
+            printf("key: %s\n", key128);
+            fflush(stdout);
         }
-        else if(strncmp(argv[4], CIPHER_AES256, sizeof(CIPHER_AES256)) == 0){
+        else if(strncmp(argv[4], mCIPHER_AES256, sizeof(mCIPHER_AES256)) == 0){
            cipherNumber = 2;
            if(argc != 6){
-                error("no key found");
+                strcpy(key256, "00000000000000000000000000000000");
             }else{
                 strcpy(key256, argv[5]);
             }
+            printf("key: %s\n", key256);
+            fflush(stdout);
         }else{
             error("incorrect cipher");
         }
-
 
     }else{
         error("invalid input");
     }
 
-
     //set up the socket
+    serverHost = gethostbyname(server);
     bzero((char *) &serverAddr, sizeof(serverAddr));
     serverAddr.sin_family = AF_INET;
     serverAddr.sin_port = htons(atoi(port));
@@ -161,18 +170,22 @@ int main(int argc, char *argv[])
 
     int bytesread;
     int acks;
+    acks = 1;
+    sprintf(ack, "%d", acks);
+    write(sockfd, filename, sizeof(filename));
     while(1){
-        //TODO, creat new socket for server side
         bytesread = read(sockfd, ack, 1024);
-        if(bytesread > 0);{
+        if(bytesread > 0){
             acks = atoi(ack);
             acks++;
             bzero(ack, sizeof(ack));
             sprintf(ack, "%d", acks);
             write(sockfd, ack, sizeof(ack));
+            bzero(ack, sizeof(ack));
         }
-        bzero(ack, sizeof(ack));
     }
+    printf("just finish the loop");
+    fflush(stdout);
     //hand shake stuff
     /*
     * out: ciphernumber|encryption of IV using null IV     //this allows the server to know what encryption is used, and if the user have the right key

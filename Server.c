@@ -2,12 +2,16 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <sys/types.h> 
+#include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <errno.h>
 #include <dirent.h>
+#include <pthread.h>
+#include <ctype.h>
+#include <netdb.h>
+#include <time.h>
 
 /*
 *	Yin-Li (Emily) Chow		10103742		T01
@@ -47,40 +51,48 @@ int main(int argc, char *argv[])
         fprintf(stderr,"ERROR, no port provided\n");
         exit(1);
     }else{
-        strcpy(key, argv[2]);
+        if(argc == 3){
+            strcpy(key, argv[2]);
+        }else{
+            strcpy(key, "00000000000000000000000000000000");
+        }
     }
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    if (sockfd < 0) 
+    if (sockfd < 0) {
         error("ERROR opening socket");
+    }
     bzero((char *) &serv_addr, sizeof(serv_addr));
+    printf("in main: %s\n", argv[1]);
+    fflush(stdout);
     portno = atoi(argv[1]);
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_addr.s_addr = INADDR_ANY;
     serv_addr.sin_port = htons(portno);
-    if (bind(sockfd, (struct sockaddr *) &serv_addr,
-            sizeof(serv_addr)) < 0) 
+    if (bind(sockfd, (struct sockaddr *) &serv_addr,sizeof(serv_addr)) < 0){
             error("ERROR on binding");
+    }
     listen(sockfd,5);
     clilen = sizeof(cli_addr);
     newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen);
     if (newsockfd < 0) {
         error("ERROR on accept");
     }
-    n = write(newsockfd, "Welcome to this backdoor\n", 26);
+
     int acks;
-    do {
+    while(1){
         bzero(ack, sizeof(ack));
-        n = read(sockfd,ack, 1024);
-        printf("recive: %s\n", ack);
-        if(n > 0);{
+        n = read(newsockfd, ack, 1024);
+        if(n > 0){
+            printf("recive: %s\n", ack);
+            fflush(stdout);
             acks = atoi(ack);
             acks++;
             bzero(ack, sizeof(ack));
             sprintf(ack, "%d", acks);
-            write(sockfd, ack,sizeof(ack));
+            write(newsockfd, ack,sizeof(ack));
         }
-    }while (1);
-    
+    }
+
     close(newsockfd);
     close(sockfd);
     return 0; 
