@@ -137,9 +137,9 @@ int main(int argc, char *argv[])
     bzero(tempbuffer, sizeof(tempbuffer));
     bzero(plan_message, sizeof(plan_message));
     //get filename, and command and file transfer
-    while(read(newsockfd, hash_message, 128) < 1){
+    while(read(newsockfd, plan_message, sizeof(plan_message)) < 1){
     }
-    printf("tempbuffer: %s\n", hash_message);
+    printf("tempbuffer: %s\n", plan_message);
     fflush(stdout);
     if(n > 0){
 

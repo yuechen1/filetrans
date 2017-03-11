@@ -195,6 +195,8 @@ int main(int argc, char *argv[])
     write(sockfd, ack, sizeof(ack));
     printf("%s\n",ack);
     fflush(stdout);
+    //wait for server response
+    while(1){}
     while((fread(plan_message, 1, sizeof(plan_message), file)>0)){
         write(sockfd, plan_message, sizeof(plan_message));
         printf("%s\n",plan_message);
