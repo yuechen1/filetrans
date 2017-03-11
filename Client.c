@@ -53,7 +53,7 @@ int main(int argc, char *argv[])
     // 2 = aes256
     int cipherNumber = 0;
     int bytesread;
-    int acks;
+    int n;
 
     //file I/O   
     char filename[1024];
@@ -151,8 +151,7 @@ int main(int argc, char *argv[])
         }
 
     }else{
-        error("invalid input");    int bytesread;
-    int acks;
+        error("invalid input");
     }
 
     //set up the socket
@@ -168,16 +167,20 @@ int main(int argc, char *argv[])
     //create local socket
     sockfd = socket(AF_INET,SOCK_STREAM, 0);
 
+    //generate iv
+    for(i = 0; i < 16; i++){
+        do
+        {
+            n = rand()%74 + 48;
+        }while(n > 122 || (n > 57 && n < 65) || (n > 90 && n < 97) );
+        iv[i] = (char) n;
+    }
+    iv[16] = '\0';
+
     //connect socket
     if(connect(sockfd, (struct sockaddr*) &serverAddr, serveraddr_size) < 0){
         error("ERROR, cannot connect to server socket");
     }
-
-    //generate iv
-    for(i = 0; i < 16; i++){
-        iv[i] = (unsigned char) (rand()%255);
-    }
-    iv[16] = '\0';
 
     //security mode and iv is put together and sent
     sprintf(tempbuffer, "%s:%s", argv[4], iv);
@@ -195,8 +198,7 @@ int main(int argc, char *argv[])
     write(sockfd, ack, sizeof(ack));
     printf("%s\n",ack);
     fflush(stdout);
-    //wait for server response
-    while(1){}
+    
     while((fread(plan_message, 1, sizeof(plan_message), file)>0)){
         write(sockfd, plan_message, sizeof(plan_message));
         printf("%s\n",plan_message);

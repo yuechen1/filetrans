@@ -34,7 +34,7 @@ int main(int argc, char *argv[])
     char iv[128];
     char key[32];
     char filename[1024];
-    char tempbuffer[2014];
+    char tempbuffer[1024];
 
     //command logic
     char* mWRITE = "write";
@@ -125,8 +125,7 @@ int main(int argc, char *argv[])
         }
         //see if its aes 256
         else if(strncmp(plan_message, mCIPHER_AES256, 6) == 0){
-           cipherNumber = 2;
-
+            cipherNumber = 2;
         }else{
             error("incorrect cipher");
         }
@@ -137,8 +136,7 @@ int main(int argc, char *argv[])
     bzero(tempbuffer, sizeof(tempbuffer));
     bzero(plan_message, sizeof(plan_message));
     //get filename, and command and file transfer
-    while(read(newsockfd, plan_message, sizeof(plan_message)) < 1){
-    }
+    n = read(newsockfd, tempbuffer, sizeof(tempbuffer));
     printf("tempbuffer: %s\n", plan_message);
     fflush(stdout);
     if(n > 0){
@@ -152,7 +150,7 @@ int main(int argc, char *argv[])
             }
             else if (tempbuffer[i] == '\0')
             {
-                error("cannot find port number");
+                error("cannot find command");
             }else{
                 i++;
             }
@@ -173,7 +171,7 @@ int main(int argc, char *argv[])
         //write is get from client
         if(strncmp(plan_message, mWRITE, 5) == 0){
             isread = 0;
-        }else if(strncmp(plan_message, mREAD, 4)){
+        }else if(strncmp(plan_message, mREAD, 4) == 0){
             isread = 1;
         }else{
             error("incorect command");
@@ -186,12 +184,14 @@ int main(int argc, char *argv[])
             file = fopen(filename, "w+");
         }
         if(file){
-            printf("file found: %s", filename);
+            printf("file found: %s\n", filename);
             fflush(stdout);
         }
 
-
-        while((n = read(newsockfd, plan_message, 128)) > 0){
+        bzero(plan_message, sizeof(plan_message));
+        while((n = read(newsockfd, plan_message, sizeof(plan_message))) > 0){
+            printf("%s\n", plan_message);
+            fflush(stdout);
             n = fputs(plan_message, file);
             if(n < 0){
                 error("cannot write to file");
