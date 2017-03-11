@@ -123,6 +123,7 @@ int main(int argc, char *argv[])
         fflush(stdout);
 
         //see which cipher is being used
+        //TODO::key currently is hard coded, this need to be changed
         if(strncmp(argv[4], mCIPHER_NONE, sizeof(mCIPHER_NONE)) == 0){
             cipherNumber = 0;
         }
@@ -177,8 +178,12 @@ int main(int argc, char *argv[])
         iv[i] = (unsigned char) (rand()%255);
     }
     iv[16] = '\0';
-    printf("iv: %s", iv);
+
+    //security mode and iv is put together and sent
+    sprintf(tempbuffer, "%s:%s", argv[4], iv);
+    printf("%s\n", tempbuffer);
     fflush(stdout);
+    write(sockfd, tempbuffer, sizeof(tempbuffer));
 
     //send command and filename to server
     if(isread == 1){
@@ -186,6 +191,7 @@ int main(int argc, char *argv[])
     }else{
         sprintf(ack, "%s %s", mREAD, filename);
     }
+    //
     write(sockfd, ack, sizeof(ack));
     printf("%s\n",ack);
     fflush(stdout);

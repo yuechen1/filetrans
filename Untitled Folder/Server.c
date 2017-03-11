@@ -31,10 +31,10 @@ int main(int argc, char *argv[])
     //character buffers
     char hash_message[128];
     char plan_message[128];
-    char ack[1024];
     char iv[128];
     char key[32];
     char filename[1024];
+    char tempbuffer[2014];
 
     //command logic
     char* mWRITE = "write";
@@ -61,7 +61,7 @@ int main(int argc, char *argv[])
     FILE *file;
     size_t readsize;
 
-    if (argc != 2) {
+    if (argc < 2) {
         fprintf(stderr,"ERROR, no port provided\n");
         exit(1);
     }else{
@@ -93,33 +93,73 @@ int main(int argc, char *argv[])
     }
     
 
-
-    int acks;
-    bzero(ack, sizeof(ack));
-    n = read(newsockfd, ack, 128);
-    printf("ack: %s\n", ack);
-    fflush(stdout);
-
+    //get encryption and iv from client
+    n = read(newsockfd, tempbuffer, sizeof(tempbuffer));
     if(n > 0){
-        printf("in the for \n");
+        i = 0;
+        while (1){
+            if (tempbuffer[i] == ':'){
+                break;
+            }
+            else if (tempbuffer[i] == '\0')
+            {
+                error("cannot find iv");
+            }else{
+                i++;
+            }
+        }
+        printf("%s\ni = %d\n", tempbuffer, i);
         fflush(stdout);
+        strncpy(plan_message, tempbuffer, i);
+        i++;
+        strncpy(iv, &tempbuffer[i], (n - i));
+        printf("cipher: %s\niv: %s\n", plan_message, iv);
+        fflush(stdout);
+        //see if its none
+        if(strncmp(plan_message, mCIPHER_NONE, 4) == 0){
+            cipherNumber = 0;
+        }
+        //see if its aes128
+        else if(strncmp(plan_message, mCIPHER_AES128, 6) == 0){
+            cipherNumber = 1;
+        }
+        //see if its aes 256
+        else if(strncmp(plan_message, mCIPHER_AES256, 6) == 0){
+           cipherNumber = 2;
+
+        }else{
+            error("incorrect cipher");
+        }
+    }else{
+        error("no input detected");
+    }
+
+    bzero(tempbuffer, sizeof(tempbuffer));
+    bzero(plan_message, sizeof(plan_message));
+    //get filename, and command and file transfer
+    while(read(newsockfd, hash_message, 128) < 1){
+    }
+    printf("tempbuffer: %s\n", hash_message);
+    fflush(stdout);
+    if(n > 0){
+
         //check for command and filename
         //sperate by space, command is not stored, only the isread is fliped
         i = 0;
         while (1){
-            if (ack[i] == ' '){
+            if (tempbuffer[i] == ' '){
                 break;
             }
-            else if (ack[i] == '\0')
+            else if (tempbuffer[i] == '\0')
             {
                 error("cannot find port number");
             }else{
                 i++;
             }
         }
-        strncpy(plan_message, ack, i);
+        strncpy(plan_message, tempbuffer, i);
         i++;
-        strncpy(filename, &ack[i], (n - i));
+        strncpy(filename, &tempbuffer[i], (n - i));
 
         //debug section
         printf("command: %s\n", plan_message);
@@ -151,20 +191,13 @@ int main(int argc, char *argv[])
         }
 
 
-        while((n = read(newsockfd, ack, 128)) > 0){
-            n = fputs(ack, file);
+        while((n = read(newsockfd, plan_message, 128)) > 0){
+            n = fputs(plan_message, file);
             if(n < 0){
                 error("cannot write to file");
             }
-            printf("recive: %s\n", ack);
+            printf("recive: %s\n", plan_message);
             fflush(stdout);
-            /*n = read(newsockfd, ack, 128);
-            if(n > 0){
-                printf("recive: %s\n", ack);
-                fflush(stdout);
-                bzero(ack, 128);
-                //write(newsockfd, ack,sizeof(ack));
-            }*/
         }
     }
 
