@@ -36,6 +36,18 @@ int main(int argc, char *argv[])
     char key[32];
     char filename[1024];
 
+    //command logic
+    char* mWRITE = "write";
+    char* mREAD = "read";
+    char* mCIPHER_NONE = "none";
+    char* mCIPHER_AES128 = "aes128";
+    char* mCIPHER_AES256 = "aes256";
+    int isread = 1;
+    // 0 = none
+    // 1 = aes128
+    // 2 = aes256
+    int cipherNumber = 0;
+
     //socket comunication information
     struct sockaddr_in serv_addr, cli_addr;
     int sockfd, newsockfd, portno;      
@@ -79,12 +91,21 @@ int main(int argc, char *argv[])
     if (newsockfd < 0) {
         error("ERROR on accept");
     }
+    
+
 
     int acks;
     bzero(ack, sizeof(ack));
     n = read(newsockfd, ack, 128);
+    printf("ack: %s\n", ack);
+    fflush(stdout);
+
     if(n > 0){
-        //check for command and stuff
+        printf("in the for \n");
+        fflush(stdout);
+        //check for command and filename
+        //sperate by space, command is not stored, only the isread is fliped
+        i = 0;
         while (1){
             if (ack[i] == ' '){
                 break;
@@ -97,22 +118,53 @@ int main(int argc, char *argv[])
             }
         }
         strncpy(plan_message, ack, i);
-        strncpy(filename, &ack[i + 1], (n - i));
+        i++;
+        strncpy(filename, &ack[i], (n - i));
 
-
+        //debug section
         printf("command: %s\n", plan_message);
         fflush(stdout);
         printf("filename: %s\n", filename);
         fflush(stdout);
-    }
 
-    while(1){
-        n = read(newsockfd, ack, 128);
-        if(n > 0){
+
+        //check for read or write.
+        //read is to pull from server
+        //write is get from client
+        if(strncmp(plan_message, mWRITE, 5) == 0){
+            isread = 0;
+        }else if(strncmp(plan_message, mREAD, 4)){
+            isread = 1;
+        }else{
+            error("incorect command");
+        }
+
+        //check for file based on input
+        if(isread == 1){
+            file = fopen(filename,"r");
+        }else{
+            file = fopen(filename, "w+");
+        }
+        if(file){
+            printf("file found: %s", filename);
+            fflush(stdout);
+        }
+
+
+        while((n = read(newsockfd, ack, 128)) > 0){
+            n = fputs(ack, file);
+            if(n < 0){
+                error("cannot write to file");
+            }
             printf("recive: %s\n", ack);
             fflush(stdout);
-            bzero(ack, 128);
-            //write(newsockfd, ack,sizeof(ack));
+            /*n = read(newsockfd, ack, 128);
+            if(n > 0){
+                printf("recive: %s\n", ack);
+                fflush(stdout);
+                bzero(ack, 128);
+                //write(newsockfd, ack,sizeof(ack));
+            }*/
         }
     }
 
