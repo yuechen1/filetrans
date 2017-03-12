@@ -12,6 +12,9 @@
 #include <ctype.h>
 #include <netdb.h>
 #include <time.h>
+#include <openssl/conf.h>
+#include <openssl/evp.h>
+#include <openssl/err.h>
 
 /*
 * Yue Chen              10065082    T03
@@ -26,18 +29,30 @@ void error(const char *msg)
     exit(1);
 }
 
+
+//code from wiki.openssl.org/index.php/EVP_Symmetric_Encryption_and_Decryption
+void handleErrors(void){
+    ERR_print_errors_fp(stderr);
+    abort();
+}
+
 int main(int argc, char *argv[])
 {
     int i;
+    //encryption
+    int len;
+    EVP_CIPHER_CTX *ctx;
+    EVP_CIPHER_CTX *ctxd;
 
     //character buffers
     char tempbuffer[1024];
-    char hash_message[128];
-    char plan_message[128];
+    unsigned char hash_message[128];
+    unsigned char plan_message[128];
     char ack[128];
-    char iv[17];
-    char key128[17];
-    char key256[33];
+    unsigned char iv[17];
+    unsigned char ivd[17];
+    unsigned char key128[17];
+    unsigned char key256[33];
     
     //command logic
     char* mWRITE = "write";
@@ -173,9 +188,44 @@ int main(int argc, char *argv[])
         {
             n = rand()%74 + 48;
         }while(n > 122 || (n > 57 && n < 65) || (n > 90 && n < 97) );
-        iv[i] = (char) n;
+        iv[i] = (unsigned char) n;
     }
     iv[16] = '\0';
+    strcpy(ivd, iv);
+
+    //start encryption
+    if(cipherNumber > 0){
+        ERR_load_crypto_strings();
+        OpenSSL_add_all_algorithms();
+        OPENSSL_config(NULL);
+
+        //create encryption and decrytion context
+        if(!(ctx = EVP_CIPHER_CTX_new())){
+            handleErrors();
+        }
+        if(!(ctxd = EVP_CIPHER_CTX_new())){
+            handleErrors();
+        }
+
+        //start the encrypt context based on cipher selected
+        if(cipherNumber == 1){
+            if(1 != EVP_EncryptInit_ex(ctx, EVP_aes_128_cbc(), NULL, key128, iv)){
+                handleErrors();
+            }
+            if(1 != EVP_DecryptInit_ex(ctxd, EVP_aes_128_cbc(), NULL, key128, iv)){
+                handleErrors();
+            }
+        }
+        else if(cipherNumber == 2){
+            if(1 != EVP_EncryptInit_ex(ctx, EVP_aes_256_cbc(), NULL, key256, iv)){
+                handleErrors();
+            }
+            if(1 != EVP_DecryptInit_ex(ctxd, EVP_aes_256_cbc(), NULL, key256, iv)){
+                handleErrors();
+            }
+        }
+    }
+
 
     //connect socket
     if(connect(sockfd, (struct sockaddr*) &serverAddr, serveraddr_size) < 0){
@@ -190,14 +240,28 @@ int main(int argc, char *argv[])
 
     //send command and filename to server
     if(isread == 1){
-        sprintf(ack, "%s %s", mWRITE, filename);
+        sprintf(plan_message, "%s %s", mWRITE, filename);
     }else{
-        sprintf(ack, "%s %s", mREAD, filename);
+        sprintf(plan_message, "%s %s", mREAD, filename);
     }
-    //
-    write(sockfd, ack, sizeof(ack));
-    printf("%s\n",ack);
-    fflush(stdout);
+    
+    //encrypt the message
+    if(cipherNumber == 1){
+        if(1 != EVP_EncryptUpdate(ctx, hash_message, &len, plan_message, strlen ((char *)plan_message))){
+            handleErrors();
+        }
+        write(sockfd, hash_message, sizeof(hash_message));
+    }
+    else if(cipherNumber == 2){
+        if(1 != EVP_EncryptUpdate(ctx, hash_message, &len, plan_message, strlen ((char *)plan_message))){
+            handleErrors();
+        }
+        write(sockfd, hash_message, sizeof(hash_message));
+    }else{
+        write(sockfd, plan_message, sizeof(plan_message));
+        printf("%s\n",plan_message);
+        fflush(stdout);
+    }
     
     while((fread(plan_message, 1, sizeof(plan_message), file)>0)){
         write(sockfd, plan_message, sizeof(plan_message));
@@ -206,6 +270,11 @@ int main(int argc, char *argv[])
         bzero(plan_message, sizeof(plan_message));
     }
 
+
+    if(cipherNumber > 0){
+        EVP_CIPHER_CTX_free(ctx);
+        EVP_CIPHER_CTX_free(ctxd);
+    }
     printf("just finish the loop");
     fflush(stdout);
 

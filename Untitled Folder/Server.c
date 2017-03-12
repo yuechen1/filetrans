@@ -12,7 +12,9 @@
 #include <ctype.h>
 #include <netdb.h>
 #include <time.h>
-
+#include <openssl/conf.h>
+#include <openssl/evp.h>
+#include <openssl/err.h>
 /*
 *	Yin-Li (Emily) Chow		10103742		T01
 * 	Yue Chen				10065082		T03
@@ -26,14 +28,27 @@ void error(const char *msg)
     exit(1);
 }
 
+//code from wiki.openssl.org/index.php/EVP_Symmetric_Encryption_and_Decryption
+void handleErrors(void){
+    ERR_print_errors_fp(stderr);
+    abort();
+}
+
 int main(int argc, char *argv[])
 {
+    //encryption
+    int len;
+    EVP_CIPHER_CTX *ctx;
+    EVP_CIPHER_CTX *ctxd;
+
     //character buffers
-    char hash_message[128];
-    char plan_message[128];
-    char iv[128];
-    char key[32];
-    char filename[1024];
+    unsigned char hash_message[128];
+    unsigned char plan_message[128];
+    unsigned char ivd[128];
+    unsigned char iv[128];
+    unsigned char key256[33];
+    unsigned char key128[17];
+    char filename[128];
     char tempbuffer[1024];
 
     //command logic
@@ -66,9 +81,9 @@ int main(int argc, char *argv[])
         exit(1);
     }else{
         if(argc == 3){
-            strcpy(key, argv[2]);
+            strcpy(key256, argv[2]);
         }else{
-            strcpy(key, "00000000000000000000000000000000");
+            strcpy(key256, "00000000000000000000000000000000");
         }
     }
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
@@ -133,11 +148,60 @@ int main(int argc, char *argv[])
         error("no input detected");
     }
 
+    //start encryption
+    if(cipherNumber > 0){
+        ERR_load_crypto_strings();
+        OpenSSL_add_all_algorithms();
+        OPENSSL_config(NULL);
+
+        //create encryption and decrytion context
+        if(!(ctx = EVP_CIPHER_CTX_new())){
+            handleErrors();
+        }
+        if(!(ctxd = EVP_CIPHER_CTX_new())){
+            handleErrors();
+        }
+
+        //start the encrypt context based on cipher selected
+        if(cipherNumber == 1){
+            if(1 != EVP_EncryptInit_ex(ctx, EVP_aes_128_cbc(), NULL, key128, iv)){
+                handleErrors();
+            }
+            if(1 != EVP_DecryptInit_ex(ctxd, EVP_aes_128_cbc(), NULL, key128, iv)){
+                handleErrors();
+            }
+        }
+        else if(cipherNumber == 2){
+            if(1 != EVP_EncryptInit_ex(ctx, EVP_aes_256_cbc(), NULL, key256, iv)){
+                handleErrors();
+            }
+            if(1 != EVP_DecryptInit_ex(ctxd, EVP_aes_256_cbc(), NULL, key256, iv)){
+                handleErrors();
+            }
+        }
+    }
+
+
+
+
     bzero(tempbuffer, sizeof(tempbuffer));
     bzero(plan_message, sizeof(plan_message));
     //get filename, and command and file transfer
-    n = read(newsockfd, tempbuffer, sizeof(tempbuffer));
-    printf("tempbuffer: %s\n", plan_message);
+    if(cipherNumber == 1){
+        n = read(newsockfd, hash_message, sizeof(hash_message));        
+        if(1 != EVP_DecryptUpdate(ctxd, plan_message, &len, hash_message, sizeof(hash_message))){
+            handleErrors();
+        }
+    }
+    else if(cipherNumber == 2){
+        n = read(newsockfd, hash_message, sizeof(hash_message));        
+        if(1 != EVP_DecryptUpdate(ctxd, plan_message, &len, hash_message, sizeof(hash_message))){
+            handleErrors();
+        }
+    }else{
+        n = read(newsockfd, plan_message, sizeof(plan_message));
+    }
+    printf("plan_message: %s\n", plan_message);
     fflush(stdout);
     if(n > 0){
 
@@ -145,33 +209,32 @@ int main(int argc, char *argv[])
         //sperate by space, command is not stored, only the isread is fliped
         i = 0;
         while (1){
-            if (tempbuffer[i] == ' '){
+            if (plan_message[i] == ' '){
                 break;
             }
-            else if (tempbuffer[i] == '\0')
+            else if (plan_message[i] == '\0')
             {
                 error("cannot find command");
             }else{
                 i++;
             }
         }
-        strncpy(plan_message, tempbuffer, i);
+        strncpy(tempbuffer, plan_message, i);
         i++;
-        strncpy(filename, &tempbuffer[i], (n - i));
+        strncpy(filename, &plan_message[i], (n - i));
 
         //debug section
-        printf("command: %s\n", plan_message);
+        printf("command: %s\n", tempbuffer);
         fflush(stdout);
         printf("filename: %s\n", filename);
         fflush(stdout);
 
-
         //check for read or write.
         //read is to pull from server
         //write is get from client
-        if(strncmp(plan_message, mWRITE, 5) == 0){
+        if(strncmp(tempbuffer, mWRITE, 5) == 0){
             isread = 0;
-        }else if(strncmp(plan_message, mREAD, 4) == 0){
+        }else if(strncmp(tempbuffer, mREAD, 4) == 0){
             isread = 1;
         }else{
             error("incorect command");
@@ -186,6 +249,16 @@ int main(int argc, char *argv[])
         if(file){
             printf("file found: %s\n", filename);
             fflush(stdout);
+        }
+
+        //send filename back to client
+        if(cipherNumber > 0){
+            if(1 != EVP_EncryptUpdate(ctx, hash_message, &len, filename, strlen(filename))){
+                handleErrors();
+            }
+            write(newsockfd, hash_message, sizeof(hash_message));
+        }else{
+            write(newsockfd, filename, sizeof(filename));
         }
 
         bzero(plan_message, sizeof(plan_message));
