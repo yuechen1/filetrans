@@ -127,6 +127,7 @@ int main(int argc, char *argv[])
                 i++;
             }
         }
+        bzero(plan_message, sizeof(plan_message));
         printf("%s\ni = %d\n", tempbuffer, i);
         fflush(stdout);
         strncpy(plan_message, tempbuffer, i);
@@ -265,19 +266,39 @@ int main(int argc, char *argv[])
 
         bzero(plan_message, sizeof(plan_message));
         bzero(hash_message, sizeof(hash_message));
-        while((n = read(newsockfd, hash_message, sizeof(hash_message))) > 0){
-            if(cipherNumber > 0){
-                if(1 != EVP_DecryptUpdate(ctxd, plan_message, &n, hash_message, sizeof(hash_message))){
-                    handleErrors();
+        if(isread == 0){
+            while((n = read(newsockfd, hash_message, sizeof(hash_message))) > 0){
+                if(cipherNumber > 0){
+                    if(1 != EVP_DecryptUpdate(ctxd, plan_message, &n, hash_message, sizeof(hash_message))){
+                        handleErrors();
+                    }
+                    BIO_dump_fp(stdout, (const char *)hash_message, n);
+                    printf("len: %d\nplan_message: %s", n, plan_message);
+                    n = fputs(plan_message, file);
+                }else{    
+                    n = fputs(hash_message, file);
                 }
-                BIO_dump_fp(stdout, (const char *)hash_message, n);
-                printf("len: %d\nplan_message: %s", n, plan_message);
-                n = fputs(plan_message, file);
-            }else{    
-                n = fputs(hash_message, file);
+                if(n < 0){
+                    error("cannot write to file");
+                }
             }
-            if(n < 0){
-                error("cannot write to file");
+        }else{
+            while((fread(plan_message, 1, sizeof(plan_message), file)>0)){
+                if(cipherNumber > 0){
+                    if(1 != EVP_EncryptUpdate(ctx, hash_message, &len, plan_message, sizeof(plan_message))){
+                        handleErrors();
+                    }
+                    write(newsockfd, hash_message, len);
+                    BIO_dump_fp(stdout, (const char *)hash_message, len);
+                    printf("len: %d\n", len);
+                    fflush(stdout);
+                }else{
+                    write(newsockfd, plan_message, sizeof(plan_message));
+                    printf("%s\n",plan_message);
+                    fflush(stdout);
+                }
+                bzero(plan_message, sizeof(plan_message));
+                bzero(hash_message, sizeof(hash_message));
             }
         }
     }
