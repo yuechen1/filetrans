@@ -89,6 +89,7 @@ int main(int argc, char *argv[])
             strcpy(key256, "00000000000000000000000000000000");
         }
         strncpy(key128, key256, sizeof(key128));
+        key128[16] = '\0';
     }
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (sockfd < 0) {
@@ -113,6 +114,7 @@ int main(int argc, char *argv[])
     
 
     //get encryption and iv from client
+    bzero(tempbuffer, sizeof(tempbuffer));
     n = read(newsockfd, tempbuffer, sizeof(tempbuffer));
     if(n > 0){
         i = 0;
@@ -128,11 +130,12 @@ int main(int argc, char *argv[])
             }
         }
         bzero(plan_message, sizeof(plan_message));
-        printf("%s\ni = %d\n", tempbuffer, i);
+        printf("%s\ni = %d\nn = %d\n", tempbuffer, i, n);
         fflush(stdout);
         strncpy(plan_message, tempbuffer, i);
         i++;
-        strncpy(iv, &tempbuffer[i], (n - i));
+        strncpy(iv, &tempbuffer[i], 16);
+        iv[16] = '\0';
         strcpy(ivd, iv);
         printf("cipher: %s\niv: %s\n", plan_message, ivd);
         fflush(stdout);
@@ -198,12 +201,12 @@ int main(int argc, char *argv[])
         if(1 != EVP_DecryptUpdate(ctxd, plan_message, &n, hash_message, sizeof(hash_message))){
             handleErrors();
         }
+        BIO_dump_fp(stdout, (const char *)hash_message, n);
+        printf("len: %d\n", n);
+        fflush(stdout);  
     }else{
         n = read(newsockfd, plan_message, sizeof(plan_message));
     }
-    BIO_dump_fp(stdout, (const char *)hash_message, n);
-    printf("len: %d\n", n);
-    fflush(stdout);  
     printf("plan_message: %s\n", plan_message);
     fflush(stdout);
     if(n > 0){
@@ -236,15 +239,15 @@ int main(int argc, char *argv[])
         //read is to pull from server
         //write is get from client
         if(strncmp(tempbuffer, mWRITE, 5) == 0){
-            isread = 0;
-        }else if(strncmp(tempbuffer, mREAD, 4) == 0){
             isread = 1;
+        }else if(strncmp(tempbuffer, mREAD, 4) == 0){
+            isread = 0;
         }else{
             error("incorect command");
         }
 
         //check for file based on input
-        if(isread == 1){
+        if(isread == 0){
             file = fopen(filename,"r");
         }else{
             file = fopen(filename, "w+");
@@ -261,12 +264,13 @@ int main(int argc, char *argv[])
             }
             write(newsockfd, hash_message, sizeof(hash_message));
         }else{
-            write(newsockfd, filename, sizeof(filename));
+            write(newsockfd, filename, strlen(filename));
         }
 
         bzero(plan_message, sizeof(plan_message));
         bzero(hash_message, sizeof(hash_message));
-        if(isread == 0){
+        if(isread == 1){
+            printf("reading from socket");
             while((n = read(newsockfd, hash_message, sizeof(hash_message))) > 0){
                 if(cipherNumber > 0){
                     if(1 != EVP_DecryptUpdate(ctxd, plan_message, &n, hash_message, sizeof(hash_message))){
@@ -283,6 +287,7 @@ int main(int argc, char *argv[])
                 }
             }
         }else{
+            printf("reading from file");
             while((fread(plan_message, 1, sizeof(plan_message), file)>0)){
                 if(cipherNumber > 0){
                     if(1 != EVP_EncryptUpdate(ctx, hash_message, &len, plan_message, sizeof(plan_message))){
@@ -308,7 +313,7 @@ int main(int argc, char *argv[])
 
     if(cipherNumber > 0){
         EVP_CIPHER_CTX_free(ctx);
-        EVP_CIPHER_CTX_free(ctx);
+        EVP_CIPHER_CTX_free(ctxd);
         EVP_cleanup();
         ERR_free_strings();
     }

@@ -94,7 +94,7 @@ int main(int argc, char *argv[])
         //see if read or write
         if(strncmp(argv[1], mWRITE, 5) == 0){
             isread = 1;
-        }else if(strncmp(argv[1], mREAD, 4)){
+        }else if(strncmp(argv[1], mREAD, 4) == 0){
             isread = 0;
         }
         printf("it is: %s\n", argv[1]);
@@ -240,12 +240,14 @@ int main(int argc, char *argv[])
     }
 
     //security mode and iv is put together and sent
+    bzero(tempbuffer, sizeof(tempbuffer));
     sprintf(tempbuffer, "%s:%s", argv[4], iv);
     printf("%s\n", tempbuffer);
     fflush(stdout);
     write(sockfd, tempbuffer, sizeof(tempbuffer));
 
     //create command and filename string
+    bzero(plan_message, sizeof(plan_message));
     if(isread == 1){
         sprintf(plan_message, "%s %s", mWRITE, filename);
     }else{
@@ -283,6 +285,7 @@ int main(int argc, char *argv[])
     bzero(plan_message, sizeof(plan_message));
     bzero(hash_message, sizeof(hash_message));
     if(isread == 1){
+        printf("reading from file\n");
         while((fread(plan_message, 1, sizeof(plan_message), file)>0)){
             if(cipherNumber > 0){
                 if(1 != EVP_EncryptUpdate(ctx, hash_message, &len, plan_message, sizeof(plan_message))){
@@ -301,22 +304,24 @@ int main(int argc, char *argv[])
             bzero(hash_message, sizeof(hash_message));
         }
     }else{
-             while((n = read(sockfd, hash_message, sizeof(hash_message))) > 0){
-                if(cipherNumber > 0){
-                    if(1 != EVP_DecryptUpdate(ctxd, plan_message, &n, hash_message, sizeof(hash_message))){
-                        handleErrors();
-                    }
-                    BIO_dump_fp(stdout, (const char *)hash_message, n);
-                    printf("len: %d\nplan_message: %s", n, plan_message);
-                    n = fputs(plan_message, file);
-                }else{    
-                    n = fputs(hash_message, file);
+        printf("reading from socket\n");
+        while(read(sockfd, hash_message, sizeof(hash_message)) > 0){
+            printf("incoming message: %s\n", hash_message);
+            if(cipherNumber > 0){
+                if(1 != EVP_DecryptUpdate(ctxd, plan_message, &n, hash_message, sizeof(hash_message))){
+                    handleErrors();
                 }
-                if(n < 0){
-                    error("cannot write to file");
-                }
+                BIO_dump_fp(stdout, (const char *)hash_message, n);
+                printf("len: %d\nplan_message: %s", n, plan_message);
+                n = fputs(plan_message, file);
+            }else{    
+                n = fputs(hash_message, file);
+            }
+            if(n < 0){
+                error("cannot write to file");
             }
         }
+    }
 
     if(cipherNumber > 0){
         EVP_CIPHER_CTX_free(ctx);
