@@ -306,6 +306,14 @@ int main(int argc, char *argv[])
     printf("just finish the loop\n");
     fflush(stdout);
 
+    if(cipherNumber > 0){
+        EVP_CIPHER_CTX_free(ctx);
+        EVP_CIPHER_CTX_free(ctx);
+        EVP_cleanup();
+        ERR_free_strings();
+    }
+
+
     close(newsockfd);
     close(sockfd);
     return 0; 

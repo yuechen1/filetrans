@@ -321,6 +321,8 @@ int main(int argc, char *argv[])
     if(cipherNumber > 0){
         EVP_CIPHER_CTX_free(ctx);
         EVP_CIPHER_CTX_free(ctxd);
+        EVP_cleanup();
+        ERR_free_strings();
     }
     printf("just finish the loop");
     fflush(stdout);
