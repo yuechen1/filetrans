@@ -42,12 +42,12 @@ int main(int argc, char *argv[])
     EVP_CIPHER_CTX *ctxd;
 
     //character buffers
-    unsigned char hash_message[128];
-    unsigned char plan_message[128];
-    unsigned char ivd[128];
-    unsigned char iv[128];
-    unsigned char key256[33];
-    unsigned char key128[17];
+    char hash_message[128];
+    char plan_message[128];
+    char ivd[17];
+    char iv[17];
+    char key256[33];
+    char key128[17];
     char filename[128];
     char tempbuffer[1024];
 
@@ -82,9 +82,13 @@ int main(int argc, char *argv[])
     }else{
         if(argc == 3){
             strcpy(key256, argv[2]);
+            while(strlen(key256) < sizeof(key256)){
+                strcat(key256, argv[2]);
+            }
         }else{
             strcpy(key256, "00000000000000000000000000000000");
         }
+        strncpy(key128, key256, sizeof(key128));
     }
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (sockfd < 0) {
@@ -128,7 +132,8 @@ int main(int argc, char *argv[])
         strncpy(plan_message, tempbuffer, i);
         i++;
         strncpy(iv, &tempbuffer[i], (n - i));
-        printf("cipher: %s\niv: %s\n", plan_message, iv);
+        strcpy(ivd, iv);
+        printf("cipher: %s\niv: %s\n", plan_message, ivd);
         fflush(stdout);
         //see if its none
         if(strncmp(plan_message, mCIPHER_NONE, 4) == 0){
@@ -167,7 +172,7 @@ int main(int argc, char *argv[])
             if(1 != EVP_EncryptInit_ex(ctx, EVP_aes_128_cbc(), NULL, key128, iv)){
                 handleErrors();
             }
-            if(1 != EVP_DecryptInit_ex(ctxd, EVP_aes_128_cbc(), NULL, key128, iv)){
+            if(1 != EVP_DecryptInit_ex(ctxd, EVP_aes_128_cbc(), NULL, key128, ivd)){
                 handleErrors();
             }
         }
@@ -175,7 +180,7 @@ int main(int argc, char *argv[])
             if(1 != EVP_EncryptInit_ex(ctx, EVP_aes_256_cbc(), NULL, key256, iv)){
                 handleErrors();
             }
-            if(1 != EVP_DecryptInit_ex(ctxd, EVP_aes_256_cbc(), NULL, key256, iv)){
+            if(1 != EVP_DecryptInit_ex(ctxd, EVP_aes_256_cbc(), NULL, key256, ivd)){
                 handleErrors();
             }
         }
@@ -187,20 +192,17 @@ int main(int argc, char *argv[])
     bzero(tempbuffer, sizeof(tempbuffer));
     bzero(plan_message, sizeof(plan_message));
     //get filename, and command and file transfer
-    if(cipherNumber == 1){
-        n = read(newsockfd, hash_message, sizeof(hash_message));        
-        if(1 != EVP_DecryptUpdate(ctxd, plan_message, &len, hash_message, sizeof(hash_message))){
-            handleErrors();
-        }
-    }
-    else if(cipherNumber == 2){
-        n = read(newsockfd, hash_message, sizeof(hash_message));        
-        if(1 != EVP_DecryptUpdate(ctxd, plan_message, &len, hash_message, sizeof(hash_message))){
+    if(cipherNumber > 0){
+        n = read(newsockfd, hash_message, sizeof(hash_message));    
+        if(1 != EVP_DecryptUpdate(ctxd, plan_message, &n, hash_message, sizeof(hash_message))){
             handleErrors();
         }
     }else{
         n = read(newsockfd, plan_message, sizeof(plan_message));
     }
+    BIO_dump_fp(stdout, (const char *)hash_message, n);
+    printf("len: %d\n", n);
+    fflush(stdout);  
     printf("plan_message: %s\n", plan_message);
     fflush(stdout);
     if(n > 0){
@@ -253,7 +255,7 @@ int main(int argc, char *argv[])
 
         //send filename back to client
         if(cipherNumber > 0){
-            if(1 != EVP_EncryptUpdate(ctx, hash_message, &len, filename, strlen(filename))){
+            if(1 != EVP_EncryptUpdate(ctx, hash_message, &len, filename, sizeof(filename))){
                 handleErrors();
             }
             write(newsockfd, hash_message, sizeof(hash_message));
@@ -262,15 +264,21 @@ int main(int argc, char *argv[])
         }
 
         bzero(plan_message, sizeof(plan_message));
-        while((n = read(newsockfd, plan_message, sizeof(plan_message))) > 0){
-            printf("%s\n", plan_message);
-            fflush(stdout);
-            n = fputs(plan_message, file);
+        bzero(hash_message, sizeof(hash_message));
+        while((n = read(newsockfd, hash_message, sizeof(hash_message))) > 0){
+            if(cipherNumber > 0){
+                if(1 != EVP_DecryptUpdate(ctxd, plan_message, &n, hash_message, sizeof(hash_message))){
+                    handleErrors();
+                }
+                BIO_dump_fp(stdout, (const char *)hash_message, n);
+                printf("len: %d\nplan_message: %s", n, plan_message);
+                n = fputs(plan_message, file);
+            }else{    
+                n = fputs(hash_message, file);
+            }
             if(n < 0){
                 error("cannot write to file");
             }
-            printf("recive: %s\n", plan_message);
-            fflush(stdout);
         }
     }
 

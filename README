@@ -1,0 +1,2 @@
+compile using gcc -o Client Client.c -L/usr/lib -lssl -lcrypto
+compile using gcc -o Server Server.c -L/usr/lib -lssl -lcrypto
