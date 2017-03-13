@@ -309,8 +309,8 @@ int main(int argc, char *argv[])
     bzero(hash_message, sizeof(hash_message));
     if(isread == 1){
         printf("reading from file\n");
-	n = fread(plan_message, 1, sizeof(plan_message), file);     
-	do{
+	    n = fread(plan_message, 1, sizeof(plan_message), file);     
+	    do{
             if(cipherNumber > 0){
                 if(1 != EVP_EncryptUpdate(ctx, hash_message, &len, plan_message, sizeof(plan_message))){
                     handleErrors();
@@ -326,11 +326,11 @@ int main(int argc, char *argv[])
             }
             bzero(plan_message, sizeof(plan_message));
             bzero(hash_message, sizeof(hash_message));
-	    n = fread(plan_message, 1, sizeof(plan_message), file);
+	        n = fread(plan_message, 1, sizeof(plan_message), file);
         }while(n > 0);
     }else{
         printf("reading from socket\n");
-	n = read(sockfd, hash_message, sizeof(hash_message));
+	    n = read(sockfd, hash_message, sizeof(hash_message));
         do{
             if(cipherNumber > 0){
                 if(1 != EVP_DecryptUpdate(ctxd, plan_message, &n, hash_message, sizeof(hash_message))){
@@ -341,13 +341,15 @@ int main(int argc, char *argv[])
                 i = fputs(plan_message, file);
             }else{    
                 i = fputs(hash_message, file);
+                printf("%s\n",hash_message);
+                fflush(stdout);
             }
             if(n < 0){
                 error("cannot write to file");
             }
             bzero(plan_message, sizeof(plan_message));
             bzero(hash_message, sizeof(hash_message));
-	    n = read(sockfd, hash_message, sizeof(hash_message));
+	        n = read(sockfd, hash_message, sizeof(hash_message));
         }while(n > 0);
     }
 

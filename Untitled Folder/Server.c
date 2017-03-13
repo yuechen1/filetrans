@@ -300,13 +300,13 @@ int main(int argc, char *argv[])
                 if(n < 0){
                     error("cannot write to file");
                 }
-		bzero(plan_message, sizeof(plan_message));
+		        bzero(plan_message, sizeof(plan_message));
                 bzero(hash_message, sizeof(hash_message));
                 n = read(newsockfd, hash_message, sizeof(hash_message));
             }while(n > 0);
         }else{
             printf("reading from file\n");
-	    n = fread(plan_message, 1, sizeof(plan_message), file);
+	        n = fread(plan_message, 1, sizeof(plan_message), file);
             do{
                 if(cipherNumber > 0){
                     if(1 != EVP_EncryptUpdate(ctx, hash_message, &len, plan_message, sizeof(plan_message))){
@@ -323,7 +323,7 @@ int main(int argc, char *argv[])
                 }
                 bzero(plan_message, sizeof(plan_message));
                 bzero(hash_message, sizeof(hash_message));
-	        n = fread(plan_message, 1, sizeof(plan_message), file);
+	            n = fread(plan_message, 1, sizeof(plan_message), file);
             }while(n > 0);
         }
     }
