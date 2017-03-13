@@ -82,11 +82,25 @@ int main(int argc, char *argv[])
     }else{
         if(argc == 3){
             strcpy(key256, argv[2]);
-            while(strlen(key256) < sizeof(key256)){
-                strcat(key256, argv[2]);
-            }
+            n = strlen(key256);
+	    while(n < 32){
+		if((32-n) < strlen(argv[2])){
+		    strcat(key256, argv[2]);
+		}else{
+		    strncat(key256, argv[2], 32 - n);
+		}
+		n = strlen(key256);
+	    }
+	    key256[32] = '\0';
         }else{
-            strcpy(key256, "00000000000000000000000000000000");
+            for(i = 0; i < 32; i++){
+        	do{
+               	    n = rand()%74 + 48;
+        	}while(n > 122 || (n > 57 && n < 65) || (n > 90 && n < 97) );
+                key256[i] = (unsigned char)n;
+     	    }
+    	    key256[32] = '\0';
+	    //strcpy(key256, "00000000000000000000000000000000");
         }
         strncpy(key128, key256, sizeof(key128));
         key128[16] = '\0';
@@ -96,7 +110,8 @@ int main(int argc, char *argv[])
         error("ERROR opening socket");
     }
     bzero((char *) &serv_addr, sizeof(serv_addr));
-    printf("in main: %s\n", argv[1]);
+    printf("Listening on port: %s\n", argv[1]);
+    printf("Using secret key: %s\n", key256);
     fflush(stdout);
     portno = atoi(argv[1]);
     serv_addr.sin_family = AF_INET;
@@ -130,15 +145,14 @@ int main(int argc, char *argv[])
             }
         }
         bzero(plan_message, sizeof(plan_message));
-        printf("%s\ni = %d\nn = %d\n", tempbuffer, i, n);
-        fflush(stdout);
+        //printf("%s\ni = %d\nn = %d\n", tempbuffer, i, n);
         strncpy(plan_message, tempbuffer, i);
         i++;
         strncpy(iv, &tempbuffer[i], 16);
         iv[16] = '\0';
         strcpy(ivd, iv);
-        printf("cipher: %s\niv: %s\n", plan_message, ivd);
-        fflush(stdout);
+        //printf("cipher: %s\niv: %s\n", plan_message, ivd);
+        //fflush(stdout);
         //see if its none
         if(strncmp(plan_message, mCIPHER_NONE, 4) == 0){
             cipherNumber = 0;
@@ -151,7 +165,7 @@ int main(int argc, char *argv[])
         else if(strncmp(plan_message, mCIPHER_AES256, 6) == 0){
             cipherNumber = 2;
         }else{
-            error("incorrect cipher");
+            error("Error: Wrong Cipher");
         }
     }else{
         error("no input detected");
@@ -201,14 +215,13 @@ int main(int argc, char *argv[])
         if(1 != EVP_DecryptUpdate(ctxd, plan_message, &n, hash_message, sizeof(hash_message))){
             handleErrors();
         }
-        BIO_dump_fp(stdout, (const char *)hash_message, n);
+        BIO_dump_fp(stdout, (const char *)hash_message, sizeof(hash_message));
         printf("len: %d\n", n);
         fflush(stdout);  
     }else{
         n = read(newsockfd, plan_message, sizeof(plan_message));
     }
-    printf("plan_message: %s\n", plan_message);
-    fflush(stdout);
+    //printf("plan_message: %s\n", plan_message);
     if(n > 0){
 
         //check for command and filename
@@ -220,7 +233,7 @@ int main(int argc, char *argv[])
             }
             else if (plan_message[i] == '\0')
             {
-                error("cannot find command");
+                error("Error, Wrong Key");
             }else{
                 i++;
             }
@@ -230,10 +243,9 @@ int main(int argc, char *argv[])
         strncpy(filename, &plan_message[i], (n - i));
 
         //debug section
-        printf("command: %s\n", tempbuffer);
-        fflush(stdout);
-        printf("filename: %s\n", filename);
-        fflush(stdout);
+        //printf("command: %s\n", tempbuffer);
+        //printf("filename: %s\n", filename);
+        //fflush(stdout);
 
         //check for read or write.
         //read is to pull from server
@@ -243,7 +255,7 @@ int main(int argc, char *argv[])
         }else if(strncmp(tempbuffer, mREAD, 4) == 0){
             isread = 0;
         }else{
-            error("incorect command");
+            error("Error, Wrong Key");
         }
 
         //check for file based on input
@@ -255,7 +267,9 @@ int main(int argc, char *argv[])
         if(file){
             printf("file found: %s\n", filename);
             fflush(stdout);
-        }
+        }else{
+	    error("File does not exist!");
+	}
 
         //send filename back to client
         if(cipherNumber > 0){
@@ -270,45 +284,51 @@ int main(int argc, char *argv[])
         bzero(plan_message, sizeof(plan_message));
         bzero(hash_message, sizeof(hash_message));
         if(isread == 1){
-            printf("reading from socket");
-            while((n = read(newsockfd, hash_message, sizeof(hash_message))) > 0){
+            printf("reading from socket\n");
+	    n = read(newsockfd, hash_message, sizeof(hash_message));
+            do{
                 if(cipherNumber > 0){
                     if(1 != EVP_DecryptUpdate(ctxd, plan_message, &n, hash_message, sizeof(hash_message))){
                         handleErrors();
                     }
-                    BIO_dump_fp(stdout, (const char *)hash_message, n);
+                    BIO_dump_fp(stdout, (const char *)hash_message, sizeof(hash_message));
                     printf("len: %d\nplan_message: %s", n, plan_message);
-                    n = fputs(plan_message, file);
+                    i = fputs(plan_message, file);
                 }else{    
-                    n = fputs(hash_message, file);
+                    i = fputs(hash_message, file);
                 }
                 if(n < 0){
                     error("cannot write to file");
                 }
-            }
+		bzero(plan_message, sizeof(plan_message));
+                bzero(hash_message, sizeof(hash_message));
+                n = read(newsockfd, hash_message, sizeof(hash_message));
+            }while(n > 0);
         }else{
-            printf("reading from file");
-            while((fread(plan_message, 1, sizeof(plan_message), file)>0)){
+            printf("reading from file\n");
+	    n = fread(plan_message, 1, sizeof(plan_message), file);
+            do{
                 if(cipherNumber > 0){
                     if(1 != EVP_EncryptUpdate(ctx, hash_message, &len, plan_message, sizeof(plan_message))){
                         handleErrors();
                     }
-                    write(newsockfd, hash_message, len);
-                    BIO_dump_fp(stdout, (const char *)hash_message, len);
+                    write(newsockfd, hash_message, sizeof(hash_message));
+                    BIO_dump_fp(stdout, (const char *)hash_message, sizeof(hash_message));
                     printf("len: %d\n", len);
                     fflush(stdout);
                 }else{
-                    write(newsockfd, plan_message, sizeof(plan_message));
-                    printf("%s\n",plan_message);
-                    fflush(stdout);
+                    write(newsockfd, plan_message, n);
+                    //printf("%s\n",plan_message);
+                    //fflush(stdout);
                 }
                 bzero(plan_message, sizeof(plan_message));
                 bzero(hash_message, sizeof(hash_message));
-            }
+	        n = fread(plan_message, 1, sizeof(plan_message), file);
+            }while(n > 0);
         }
     }
 
-    printf("just finish the loop\n");
+    printf("OK\n");
     fflush(stdout);
 
     if(cipherNumber > 0){

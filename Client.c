@@ -88,7 +88,7 @@ int main(int argc, char *argv[])
     * split the variables and stuff here!!!
     */
     //printf("Program started\n");
-    if(argc > 4 && argc < 6){
+    if(argc > 4 && argc <= 6){
         //printf("see if read or write\n");
 
         //see if read or write
@@ -113,7 +113,9 @@ int main(int argc, char *argv[])
         if(file){
             printf("file found: %s\n", filename);
             fflush(stdout);
-        }
+        }else{
+	    error("Cannot get File");
+	}
 
         //find the hostname and port number
         strcpy(tempbuffer, argv[3]);
@@ -129,25 +131,35 @@ int main(int argc, char *argv[])
                 i++;
             }
         }
-        strncpy(server, tempbuffer, i);
+	bzero(server, sizeof(server));        
+	strncpy(server, tempbuffer, i);
         
-        printf("server: %s\n", server);
-        fflush(stdout);
+        printf("server: %s\ni: %d\n", server, i);
         strncpy(port, &tempbuffer[i+1], (strlen(argv[3]) - i));
         printf("port: %s\n", port);
         fflush(stdout);
 
         //see which cipher is being used
-        //TODO::key currently is hard coded, this need to be changed
         if(strncmp(argv[4], mCIPHER_NONE, sizeof(mCIPHER_NONE)) == 0){
             cipherNumber = 0;
         }
         else if(strncmp(argv[4], mCIPHER_AES128, sizeof(mCIPHER_AES128)) == 0){
             cipherNumber = 1;
             if(argc != 6){
-                strcpy(key128, "0000000000000000");
+                error("No Key Input");
+		//strcpy(key128, "0000000000000000");
             }else{
                 strcpy(key128, argv[5]);
+		n = strlen(key128);
+	    	while(n < 16){
+		    if((16-n) < strlen(argv[5])){
+		        strcat(key256, argv[5]);
+		    }else{
+		        strncat(key256, argv[5], 16 - n);
+		    }
+		    n = strlen(key128);
+	        }
+	        key128[16] = '\0';
             }
             printf("key: %s\n", key128);
             fflush(stdout);
@@ -155,9 +167,20 @@ int main(int argc, char *argv[])
         else if(strncmp(argv[4], mCIPHER_AES256, sizeof(mCIPHER_AES256)) == 0){
            cipherNumber = 2;
            if(argc != 6){
-                strcpy(key256, "00000000000000000000000000000000");
+                error("No Key Input");                
+		//strcpy(key256, "00000000000000000000000000000000");
             }else{
                 strcpy(key256, argv[5]);
+		n = strlen(key256);
+	    	while(n < 32){
+		    if((32-n) < strlen(argv[5])){
+		        strcat(key256, argv[5]);
+		    }else{
+		        strncat(key256, argv[5], 32 - n);
+		    }
+		    n = strlen(key256);
+	        }
+	        key128[32] = '\0';
             }
             printf("key: %s\n", key256);
             fflush(stdout);
@@ -259,7 +282,7 @@ int main(int argc, char *argv[])
         if(1 != EVP_EncryptUpdate(ctx, hash_message, &len, plan_message, sizeof(plan_message))){
             handleErrors();
         }
-        write(sockfd, hash_message, len);
+        write(sockfd, hash_message, sizeof(hash_message));
         BIO_dump_fp(stdout, (const char *)hash_message, len);
         printf("len: %d\n", len);
         fflush(stdout);
@@ -269,14 +292,14 @@ int main(int argc, char *argv[])
         fflush(stdout);
     }
     
-
+    //get filename from Server, if encrypted filename does not match then the Server have wrong key
     while(read(sockfd, hash_message, sizeof(hash_message)) < 0){
         if(cipherNumber > 0){
             if(1 != EVP_DecryptUpdate(ctxd, plan_message, &n, hash_message, sizeof(hash_message))){
                     handleErrors();
             }
-            if(strncpy(filename, plan_message, strlen(filename)) != 0){
-                error("incorrect key\n");
+            if(strncmp(filename, plan_message, strlen(filename)) != 0){
+                error("Error, incorrect key\n");
             }
         }
     }
@@ -286,41 +309,46 @@ int main(int argc, char *argv[])
     bzero(hash_message, sizeof(hash_message));
     if(isread == 1){
         printf("reading from file\n");
-        while((fread(plan_message, 1, sizeof(plan_message), file)>0)){
+	n = fread(plan_message, 1, sizeof(plan_message), file);     
+	do{
             if(cipherNumber > 0){
                 if(1 != EVP_EncryptUpdate(ctx, hash_message, &len, plan_message, sizeof(plan_message))){
                     handleErrors();
                 }
-                write(sockfd, hash_message, len);
-                BIO_dump_fp(stdout, (const char *)hash_message, len);
-                printf("len: %d\n", len);
-                fflush(stdout);
+                write(sockfd, hash_message, sizeof(hash_message));
+                BIO_dump_fp(stdout, (const char *)hash_message, sizeof(hash_message));
+                //printf("len: %d\n", len);
+                //fflush(stdout);
             }else{
-                write(sockfd, plan_message, sizeof(plan_message));
-                printf("%s\n",plan_message);
-                fflush(stdout);
+                write(sockfd, plan_message, n);
+                //printf("%s\n",plan_message);
+                //fflush(stdout);
             }
             bzero(plan_message, sizeof(plan_message));
             bzero(hash_message, sizeof(hash_message));
-        }
+	    n = fread(plan_message, 1, sizeof(plan_message), file);
+        }while(n > 0);
     }else{
         printf("reading from socket\n");
-        while(read(sockfd, hash_message, sizeof(hash_message)) > 0){
-            printf("incoming message: %s\n", hash_message);
+	n = read(sockfd, hash_message, sizeof(hash_message));
+        do{
             if(cipherNumber > 0){
                 if(1 != EVP_DecryptUpdate(ctxd, plan_message, &n, hash_message, sizeof(hash_message))){
                     handleErrors();
                 }
-                BIO_dump_fp(stdout, (const char *)hash_message, n);
+                BIO_dump_fp(stdout, (const char *)hash_message, sizeof(hash_message));
                 printf("len: %d\nplan_message: %s", n, plan_message);
-                n = fputs(plan_message, file);
+                i = fputs(plan_message, file);
             }else{    
-                n = fputs(hash_message, file);
+                i = fputs(hash_message, file);
             }
             if(n < 0){
                 error("cannot write to file");
             }
-        }
+            bzero(plan_message, sizeof(plan_message));
+            bzero(hash_message, sizeof(hash_message));
+	    n = read(sockfd, hash_message, sizeof(hash_message));
+        }while(n > 0);
     }
 
     if(cipherNumber > 0){

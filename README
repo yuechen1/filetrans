@@ -1,2 +1,55 @@
-compile using gcc -o Client Client.c -L/usr/lib -lssl -lcrypto
-compile using gcc -o Server Server.c -L/usr/lib -lssl -lcrypto
+Name:		Yue Chen
+UCID:		10065082
+Tut: 		T03
+Partner:	Yin-Li (Emily) Chow (10103742, T01)
+
+How to run:
+- compile using gcc -o Client Client.c -L/usr/lib -lssl -lcrypto
+- compile using gcc -o Server Server.c -L/usr/lib -lssl -lcrypto
+- run Client in one window and Server in another
+
+test for correctness:
+
+Server tested with preset key (key is preset for testing)
+
+[yuechen@gfx03-sa Untitled Folder]$ gcc -o Server Server.c -L/usr/lib -lssl -lcrypto
+[yuechen@gfx03-sa Untitled Folder]$ ./Server 8001
+Listening on port: 8001
+Using secret key: 00000000000000000000000000000000
+file found: README
+reading from socket
+OK
+[yuechen@gfx03-sa Untitled Folder]$ sha256sum README                            
+ba5772f9f0b88b4ce94de38f0298fc139046c38f7149b80959f76801af5b6bce  README
+[yuechen@gfx03-sa Untitled Folder]$ 
+
+Client with same preset key (key is preset for testing)
+[yuechen@gfx03-sa filetrans]$ gcc -o Client Client.c -L/usr/lib -lssl -lcrypto
+[yuechen@gfx03-sa filetrans]$ ./Client write README localhost:8001 none
+it is: write
+file found: README
+server: localhost
+port: 8001
+key: ��
+iv: wx59CSrdkOxALeY2
+none:wx59CSrdkOxALeY2
+write README
+reading from file
+just finish the loop[yuechen@gfx03-sa filetrans]$ ./Client write README localhost:8001 none                   sha256sum README
+ba5772f9f0b88b4ce94de38f0298fc139046c38f7149b80959f76801af5b6bce  README
+[yuechen@gfx03-sa filetrans]$ 
+
+
+Sending encrypted or binary files does not work. As reading from socket always drop the first 16 bytes.
+This only apply to sending the content of files, files name and command is sent encrypted with no issues.
+
+
+Communication Protocol:
+
+Client sent "cipher:iv" to Server
+Client sent "command filename" to Server
+	if command is incorrect on server side then client have wrong key
+Server sent filename to Client
+	if filename does not match then server have wrong key
+File is sent
+
